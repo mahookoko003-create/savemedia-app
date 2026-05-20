@@ -5,45 +5,58 @@ import yt_dlp
 
 app = FastAPI()
 
-# Sitemizin (Frontend) backend ile güvenli konuşabilmesi için izin (CORS) veriyoruz
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Gerçek hayatta buraya sadece kendi github.io linkini yazacağız
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Tarayıcıdan gelecek link verisi için şablon
 class VideoRequest(BaseModel):
     url: str
 
 @app.get("/")
 def home():
-    return {"status": "Sistem Aktif", "mesaj": "Medya İndirici Motoruna Hoş Geldiniz!"}
+    return {"status": "Sistem Aktif", "mesaj": "Sosyal Medya İndirici Motoru Aktif!"}
 
 @app.post("/analyze")
 def analyze_video(request: VideoRequest):
     video_url = request.url
     
-    # Sunucuyu yormamak için videoyu İNDİRMİYORUZ, sadece linkleri ayıklıyoruz
+    # YouTube dışındaki platformlar için optimize edilmiş ayarlar
     ydl_opts = {
         'format': 'best',
         'noplaylist': True,
-        'quiet': True
+        'quiet': True,
+        # YouTube engelini tetiklememek için extractor'ları kısıtlayabiliriz ama yt-dlp otomatik seçer
     }
+    
+    # Güvenlik kontrolü: Eğer kullanıcı hala YouTube linki girerse uyaralım
+    if "youtube.com" in video_url or "youtu.be" in video_url:
+        raise HTTPException(
+            status_code=400, 
+            detail="YouTube telif ve bot engelleri nedeniyle geçici olarak devre dışıdır. Lütfen TikTok, Instagram veya Twitter linki deneyin!"
+        )
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # Video bilgilerini YouTube'dan çek
             info = ydl.extract_info(video_url, download=False)
             
-            # Bize lazım olan ham bilgileri ayıkla
-            title = info.get('title', 'Bilinmeyen Video')
+            title = info.get('title', 'Sosyal Medya Videosu')
+            # Bazı platformlarda başlık çok uzun olur, ilk 50 karakteri alalım şık dursun
+            if len(title) > 50:
+                title = title[:50] + "..."
+                
             thumbnail = info.get('thumbnail', '')
-            
-            # Doğrudan indirme (stream) linkleri
             download_url = info.get('url', '')
+            
+            # Eğer doğrudan url çıkmadıysa formatların içine bakalım
+            if not download_url and info.get('formats'):
+                download_url = info.get('formats')[-1].get('url', '')
+
+            if not download_url:
+                raise Exception("İndirme linki bulunamadı.")
             
             return {
                 "success": True,
@@ -53,5 +66,5 @@ def analyze_video(request: VideoRequest):
             }
             
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Link çözülemedi veya desteklenmiyor: {str(e)}")
-      
+        raise HTTPException(status_code=400, detail=f"Desteklenmeyen link veya erişim engeli: {str(e)}")
+        
