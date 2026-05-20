@@ -18,10 +18,16 @@ async function downloadMedia() {
             body: JSON.stringify({ url: urlInput })
         });
 
+        // Siyah ekrana düşmemek için gelen cevabı kontrol ediyoruz
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || "Sunucu isteği reddetti.");
+        }
+
         const data = await response.json();
 
         if (data.success) {
-            // HACKER DOKUNUŞU: href kısmını bizim proxy tüneline yönlendirdik!
+            // Hacker Tüneli Linki
             const proxyUrl = `${BACKEND_URL}/proxy?url=${encodeURIComponent(data.download_url)}`;
 
             resultDiv.innerHTML = `
@@ -43,10 +49,17 @@ async function downloadMedia() {
                 </div>
             `;
         } else {
-            resultDiv.innerHTML = `<p style='color: red;'>❌ Hata: ${data.detail || 'Link çözülemedi.'}</p>`;
+            resultDiv.innerHTML = `<p style='color: red;'>❌ Hata: Link çözülemedi.</p>`;
         }
 
     } catch (error) {
-        resultDiv.innerHTML = "<p style='color: red;'>❌ Sunucuya bağlanılamadı.</p>";
+        console.error("Hata Detayı:", error);
+        // Siyah ekrandaki hatayı burada sitemizin içine okunaklı şekilde yazdırıyoruz
+        resultDiv.innerHTML = `
+            <div style="margin-top: 15px; background: #fde8e8; border: 1px solid #f8b4b4; padding: 12px; border-radius: 5px; text-align: left;">
+                <p style="color: #9b1c1c; font-weight: bold; margin: 0 0 5px 0;">❌ Sistem Uyarısı</p>
+                <p style="color: #c81e1e; font-size: 14px; margin: 0;">${error.message}</p>
+            </div>
+        `;
     }
 }
